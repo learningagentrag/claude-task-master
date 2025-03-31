@@ -16,6 +16,9 @@ This task involves completing the Model Context Protocol (MCP) server implementa
 7. Integrate the ModelContextProtocol SDK directly to streamline resource and tool registration, ensuring compatibility with FastMCP's transport mechanisms.
 8. Identify and address missing components or functionalities to meet FastMCP best practices, such as robust error handling, monitoring endpoints, and concurrency support.
 9. Update documentation to include examples of using the MCP server with FastMCP, detailed setup instructions, and client integration guides.
+10. Implement standardized caching pattern using getCachedOrExecute function with cache keys based on function parameters.
+11. Follow consistent response format { success, data/error, fromCache } for all MCP commands.
+12. Use executeMCPToolAction in all MCP tool implementations for consistent error handling and response formatting.
 
 The implementation must ensure compatibility with existing MCP clients and follow RESTful API design principles, while supporting concurrent requests and maintaining robust error handling.
 
@@ -55,7 +58,7 @@ Testing for the MCP server implementation will follow a comprehensive approach b
 ### Module Mocking Strategy
 ```javascript
 // Mock the FastMCP SDK
-jest.mock('@model-context-protocol/sdk', () => ({
+jest.mock('fastmcpp', () => ({
   MCPServer: jest.fn().mockImplementation(() => ({
     registerTool: jest.fn(),
     registerResource: jest.fn(),
@@ -69,7 +72,7 @@ jest.mock('@model-context-protocol/sdk', () => ({
 }));
 
 // Import modules after mocks
-import { MCPServer, MCPError } from '@model-context-protocol/sdk';
+import { MCPServer, MCPError } from 'fastmcp';
 import { initMCPServer } from '../../scripts/mcp-server.js';
 ```
 
@@ -98,6 +101,12 @@ import { initMCPServer } from '../../scripts/mcp-server.js';
 - Benchmark response times with and without caching
 - Test memory usage under load
 - Verify concurrent request handling
+
+### Caching Testing
+- Test cache hit/miss scenarios with different parameters
+- Verify cache invalidation works correctly
+- Test cache performance under load
+- Validate fromCache flag in responses
 
 ## Test Quality Guidelines
 
@@ -135,6 +144,12 @@ import { initMCPServer } from '../../scripts/mcp-server.js';
    - Test stdio communication
    - Verify proper message formatting
    - Test error handling in transport layer
+
+6. **Caching Mechanism**
+   - Test getCachedOrExecute with various cache keys
+   - Verify cache hit/miss behavior
+   - Test cache invalidation
+   - Validate fromCache flag in responses
 
 All tests will be automated and integrated into the CI/CD pipeline to ensure consistent quality.
 
@@ -350,89 +365,509 @@ function listTasks(tasksPath, statusFilter, withSubtasks = false, outputFormat =
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for parsing PRD documents to generate tasks.
 ### Details:
-Following MCP implementation standards:\n\n1. Create parsePRDDirect function in task-master-core.js:\n   - Import parsePRD from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: input file, output path, numTasks\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create parse-prd.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import parsePRDDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerParsePRDTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for parsePRDDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create parsePRDDirect function in task-master-core.js:
+   - Import parsePRD from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: input file, output path, numTasks
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create parse-prd.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import parsePRDDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerParsePRDTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for parsePRDDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 17. Implement update MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for updating multiple tasks based on prompt.
 ### Details:
-Following MCP implementation standards:\n\n1. Create updateTasksDirect function in task-master-core.js:\n   - Import updateTasks from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: fromId, prompt, useResearch\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create update.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import updateTasksDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerUpdateTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for updateTasksDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create updateTasksDirect function in task-master-core.js:
+   - Import updateTasks from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: fromId, prompt, useResearch
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create update.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import updateTasksDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerUpdateTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for updateTasksDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 18. Implement update-task MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for updating a single task by ID with new information.
 ### Details:
-Following MCP implementation standards:\n\n1. Create updateTaskByIdDirect function in task-master-core.js:\n   - Import updateTaskById from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: taskId, prompt, useResearch\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create update-task.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import updateTaskByIdDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerUpdateTaskTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for updateTaskByIdDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create updateTaskByIdDirect function in task-master-core.js:
+   - Import updateTaskById from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: taskId, prompt, useResearch
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create update-task.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import updateTaskByIdDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerUpdateTaskTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for updateTaskByIdDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 19. Implement update-subtask MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for appending information to a specific subtask.
 ### Details:
-Following MCP implementation standards:\n\n1. Create updateSubtaskByIdDirect function in task-master-core.js:\n   - Import updateSubtaskById from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: subtaskId, prompt, useResearch\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create update-subtask.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import updateSubtaskByIdDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerUpdateSubtaskTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for updateSubtaskByIdDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create updateSubtaskByIdDirect function in task-master-core.js:
+   - Import updateSubtaskById from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: subtaskId, prompt, useResearch
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create update-subtask.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import updateSubtaskByIdDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerUpdateSubtaskTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for updateSubtaskByIdDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 20. Implement generate MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for generating task files from tasks.json.
 ### Details:
-Following MCP implementation standards:\n\n1. Create generateTaskFilesDirect function in task-master-core.js:\n   - Import generateTaskFiles from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: tasksPath, outputDir\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create generate.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import generateTaskFilesDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerGenerateTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for generateTaskFilesDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create generateTaskFilesDirect function in task-master-core.js:
+   - Import generateTaskFiles from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: tasksPath, outputDir
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create generate.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import generateTaskFilesDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerGenerateTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for generateTaskFilesDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 21. Implement set-status MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for setting task status.
 ### Details:
-Following MCP implementation standards:\n\n1. Create setTaskStatusDirect function in task-master-core.js:\n   - Import setTaskStatus from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: taskId, status\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create set-status.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import setTaskStatusDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerSetStatusTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for setTaskStatusDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create setTaskStatusDirect function in task-master-core.js:
+   - Import setTaskStatus from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: taskId, status
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create set-status.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import setTaskStatusDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerSetStatusTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for setTaskStatusDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 22. Implement show-task MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for showing task details.
 ### Details:
-Following MCP implementation standards:\n\n1. Create showTaskDirect function in task-master-core.js:\n   - Import showTask from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: taskId\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create show-task.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import showTaskDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerShowTaskTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for showTaskDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create showTaskDirect function in task-master-core.js:
+   - Import showTask from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: taskId
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create show-task.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import showTaskDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerShowTaskTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for showTaskDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 23. Implement next-task MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for finding the next task to work on.
 ### Details:
-Following MCP implementation standards:\n\n1. Create nextTaskDirect function in task-master-core.js:\n   - Import nextTask from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments (no specific args needed except projectRoot/file)\n   - Handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create next-task.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import nextTaskDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerNextTaskTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for nextTaskDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create nextTaskDirect function in task-master-core.js:
+   - Import nextTask from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments (no specific args needed except projectRoot/file)
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create next-task.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import nextTaskDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerNextTaskTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for nextTaskDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 24. Implement expand-task MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for expanding a task into subtasks.
 ### Details:
-Following MCP implementation standards:\n\n1. Create expandTaskDirect function in task-master-core.js:\n   - Import expandTask from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: taskId, prompt, num, force, research\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create expand-task.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import expandTaskDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerExpandTaskTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for expandTaskDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create expandTaskDirect function in task-master-core.js:
+   - Import expandTask from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: taskId, prompt, num, force, research
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create expand-task.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import expandTaskDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerExpandTaskTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for expandTaskDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 25. Implement add-task MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for adding new tasks.
 ### Details:
-Following MCP implementation standards:\n\n1. Create addTaskDirect function in task-master-core.js:\n   - Import addTask from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: prompt, priority, dependencies\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create add-task.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import addTaskDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerAddTaskTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for addTaskDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create addTaskDirect function in task-master-core.js:
+   - Import addTask from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: prompt, priority, dependencies
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create add-task.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import addTaskDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerAddTaskTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for addTaskDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 26. Implement add-subtask MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for adding subtasks to existing tasks.
 ### Details:
-Following MCP implementation standards:\n\n1. Create addSubtaskDirect function in task-master-core.js:\n   - Import addSubtask from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: parentTaskId, title, description, details\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create add-subtask.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import addSubtaskDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerAddSubtaskTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for addSubtaskDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create addSubtaskDirect function in task-master-core.js:
+   - Import addSubtask from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: parentTaskId, title, description, details
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create add-subtask.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import addSubtaskDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerAddSubtaskTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for addSubtaskDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 27. Implement remove-subtask MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for removing subtasks from tasks.
 ### Details:
-Following MCP implementation standards:\n\n1. Create removeSubtaskDirect function in task-master-core.js:\n   - Import removeSubtask from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: parentTaskId, subtaskId\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create remove-subtask.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import removeSubtaskDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerRemoveSubtaskTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for removeSubtaskDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create removeSubtaskDirect function in task-master-core.js:
+   - Import removeSubtask from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: parentTaskId, subtaskId
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create remove-subtask.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import removeSubtaskDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerRemoveSubtaskTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for removeSubtaskDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 28. Implement analyze MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for analyzing task complexity.
 ### Details:
-Following MCP implementation standards:\n\n1. Create analyzeTaskComplexityDirect function in task-master-core.js:\n   - Import analyzeTaskComplexity from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: taskId\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create analyze.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import analyzeTaskComplexityDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerAnalyzeTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for analyzeTaskComplexityDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create analyzeTaskComplexityDirect function in task-master-core.js:
+   - Import analyzeTaskComplexity from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: taskId
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create analyze.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import analyzeTaskComplexityDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerAnalyzeTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for analyzeTaskComplexityDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 29. Implement clear-subtasks MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for clearing subtasks from a parent task.
 ### Details:
-Following MCP implementation standards:\n\n1. Create clearSubtasksDirect function in task-master-core.js:\n   - Import clearSubtasks from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: taskId\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create clear-subtasks.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import clearSubtasksDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerClearSubtasksTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for clearSubtasksDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create clearSubtasksDirect function in task-master-core.js:
+   - Import clearSubtasks from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: taskId
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create clear-subtasks.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import clearSubtasksDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerClearSubtasksTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for clearSubtasksDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
 
 ## 30. Implement expand-all MCP command [pending]
 ### Dependencies: None
 ### Description: Create direct function wrapper and MCP tool for expanding all tasks into subtasks.
 ### Details:
-Following MCP implementation standards:\n\n1. Create expandAllTasksDirect function in task-master-core.js:\n   - Import expandAllTasks from task-manager.js\n   - Handle file paths using findTasksJsonPath utility\n   - Process arguments: prompt, num, force, research\n   - Validate inputs and handle errors with try/catch\n   - Return standardized { success, data/error } object\n   - Add to directFunctions map\n\n2. Create expand-all.js MCP tool in mcp-server/src/tools/:\n   - Import z from zod for parameter schema\n   - Import executeMCPToolAction from ./utils.js\n   - Import expandAllTasksDirect from task-master-core.js\n   - Define parameters matching CLI options using zod schema\n   - Implement registerExpandAllTool(server) with server.addTool\n   - Use executeMCPToolAction in execute method\n\n3. Register in tools/index.js\n\n4. Add to .cursor/mcp.json with appropriate schema\n\n5. Write tests following testing guidelines:\n   - Unit test for expandAllTasksDirect\n   - Integration test for MCP tool
+Following MCP implementation standards and the listTasks reference pattern:
+
+1. Create expandAllTasksDirect function in task-master-core.js:
+   - Import expandAllTasks from task-manager.js
+   - Handle file paths using findTasksJsonPath utility
+   - Process arguments: prompt, num, force, research
+   - Use getCachedOrExecute with cache key based on input parameters
+   - Validate inputs and handle errors with try/catch
+   - Return standardized { success, data/error, fromCache } object
+   - Add to directFunctions map
+
+2. Create expand-all.js MCP tool in mcp-server/src/tools/:
+   - Import z from zod for parameter schema
+   - Import executeMCPToolAction from ./utils.js
+   - Import expandAllTasksDirect from task-master-core.js
+   - Define parameters matching CLI options using zod schema
+   - Implement registerExpandAllTool(server) with server.addTool
+   - Use executeMCPToolAction in execute method to handle errors consistently
+
+3. Register in tools/index.js
+
+4. Add to .cursor/mcp.json with appropriate schema
+
+5. Write tests following testing guidelines:
+   - Unit test for expandAllTasksDirect with cache hit/miss scenarios
+   - Integration test for MCP tool with response validation
+
+## 31. Implement getCachedOrExecute Utility Function [pending]
+### Dependencies: 23.9
+### Description: Create a reusable utility function for caching function results based on input parameters
+### Details:
+1. Create a utility function that handles caching of function results
+2. Implement cache key generation based on function parameters
+3. Add TTL (time-to-live) support for cache entries
+4. Implement cache invalidation strategies
+5. Add fromCache flag to response objects
+6. Create cache statistics tracking
+7. Add debug logging for cache hits/misses
+8. Write comprehensive tests for the caching utility
+9. Document usage patterns and best practices
+10. Ensure thread safety for concurrent access
+
+## 32. Implement executeMCPToolAction Utility Function [pending]
+### Dependencies: 23.9, 23.31
+### Description: Create a standardized utility function for executing MCP tool actions with consistent error handling and response formatting
+### Details:
+1. Create a utility function that standardizes MCP tool execution
+2. Implement consistent error handling with try/catch
+3. Add standardized response formatting
+4. Support for passing context to direct functions
+5. Handle fromCache flag in responses
+6. Add performance metrics tracking
+7. Implement logging for tool execution
+8. Write comprehensive tests for the utility function
+9. Document usage patterns and best practices
+10. Ensure compatibility with all MCP tools
+
+## 33. Create Reference Implementation for listTasks MCP Command [pending]
+### Dependencies: 23.31, 23.32
+### Description: Implement the listTasks MCP command as a reference implementation for all other commands to follow
+### Details:
+1. Create listTasksDirect function in task-master-core.js
+2. Implement caching using getCachedOrExecute with proper cache key
+3. Add standardized error handling with try/catch
+4. Return { success, data/error, fromCache } response format
+5. Create list-tasks.js MCP tool using executeMCPToolAction
+6. Register in tools/index.js
+7. Add to .cursor/mcp.json
+8. Write comprehensive tests
+9. Document as reference implementation
+10. Create code templates based on this implementation
 

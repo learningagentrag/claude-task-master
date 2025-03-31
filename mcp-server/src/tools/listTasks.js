@@ -49,5 +49,3 @@ export function registerListTasksTool(server) {
     },
   });
 }
-
-// We no longer need the formatTasksResponse function as we're returning raw JSON data

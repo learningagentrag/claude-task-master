@@ -6,9 +6,9 @@ describe('ContextManager', () => {
 
   beforeEach(() => {
     contextManager = new ContextManager({
-      maxCacheSize: 10,
+      maxCacheSize: 1000,
       ttl: 1000, // 1 second for testing
-      maxContextSize: 1000
+      maxContextSize: 30000
     });
   });
 
